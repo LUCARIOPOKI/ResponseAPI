@@ -1,5 +1,6 @@
 import os
 import time
+import base64
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -79,3 +80,123 @@ def streaming_response():
     if event.type == 'response.output_text.delta':
         print(event.delta, end='')
   print("Time taken: {:.2f} seconds".format(end - start)) 
+
+def function_call(): # need to write the function
+    response = client.responses.create(  
+        model=model,    
+        tools=[  
+            {  
+                "type": "function",  
+                "name": "get_weather",  
+                "description": "Get the weather for a location",  
+                "parameters": {  
+                    "type": "object",  
+                    "properties": {  
+                        "location": {"type": "string"},  
+                    },  
+                    "required": ["location"],  
+                },  
+            }  
+        ],  
+        input=[{"role": "user", "content": "What's the weather in San Francisco?"}],  
+    )  
+   
+    print(response.output_text)     
+     
+    input = []  
+    for output in response.output:  
+        if output.type == "function_call":  
+            match output.name:  
+                case "get_weather":  
+                    input.append(  
+                        {  
+                            "type": "function_call_output",  
+                            "call_id": output.call_id,  
+                            "output": '{"temperature": "70 degrees"}',  
+                        }  
+                    )  
+                case _:  
+                    raise ValueError(f"Unknown function call: {output.name}")  
+    second_response = client.responses.create(  
+        model=model,  
+        previous_response_id=response.id,  
+        input=input  
+    )  
+    return second_response.output_text 
+
+def code_intepreter():
+    instructions = "You are a personal math tutor. When asked a math question, write and run code using the python tool to answer the question."
+
+    response = client.responses.create(
+        model=model,
+        tools=[
+            {
+                "type": "code_interpreter",
+                "container": {"type": "auto"}
+            }
+        ],
+        instructions=instructions,
+        input="I need to solve the equation 3x + 11 = 14. Can you help me?",
+    )
+    return response.output_text
+
+def List_input_items():
+    response = client.responses.input_items.list("your response id") 
+    return response.model_dump_json(indent=2)
+
+def image_input():
+
+    def encode_image(image_path):
+        with open(image_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode("utf-8")
+        
+    image_path = r"some img path"  
+
+    base64_image = encode_image(image_path)
+
+    response = client.responses.create(
+        model=model,
+        input=[
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type":"input_text", 
+                    "text": "What is in this image?"
+                },
+                {
+                    "type": "input_image",
+                    "image_url": f"data:image/jpeg;base64,{base64_image}"
+                }
+                ]
+            }
+        ]
+    )
+    return response.output_text
+
+def pdf_input(): # didnt execute bcoz the server had an error processing your request
+    with open("some_file.pdf", "rb") as f: 
+        data = f.read()
+
+    base64_string = base64.b64encode(data).decode("utf-8")
+
+    response = client.responses.create(
+        model=model, 
+        input=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_file",
+                        "filename": "book_summs.pdf",
+                        "file_data": f"data:application/pdf;base64,{base64_string}",
+                    },
+                    {
+                        "type": "input_text",
+                        "text": "Summarize this PDF",
+                    },
+                ],
+            },
+        ]
+    )
+    return response.output_text
