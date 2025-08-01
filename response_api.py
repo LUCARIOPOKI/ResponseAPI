@@ -174,29 +174,32 @@ def image_input():
     )
     return response.output_text
 
-def pdf_input(): # didnt execute bcoz the server had an error processing your request
-    with open("some_file.pdf", "rb") as f: 
-        data = f.read()
+def Upload_PDF(): # to upload a pdf file and get the file ID to use it later "assistant-EZVRdGC85AUGdc64B2QZGu"
+    file = client.files.create(
+        file=open("Book_Summarization_IEEE.pdf", "rb"),
+        purpose="assistants"
+    )
+    result = file.model_dump_json(indent=2)
+    file_id = file.id
+    return (f"File uploaded successfully. File ID: {file_id}\n{result}")
 
-    base64_string = base64.b64encode(data).decode("utf-8")
-
+def pdf_input(): # Process the PDF file we uploaded earlier
     response = client.responses.create(
-        model=model, 
-        input=[
+        model=model,
+        input = [
             {
                 "role": "user",
                 "content": [
                     {
-                        "type": "input_file",
-                        "filename": "book_summs.pdf",
-                        "file_data": f"data:application/pdf;base64,{base64_string}",
+                        "type": "input_file", # input type  
+                        "file_id": "assistant-EZVRdGC85AUGdc64B2QZGu" # file ID of the PDF we uploaded earlier
                     },
                     {
-                        "type": "input_text",
-                        "text": "Summarize this PDF",
-                    },
-                ],
-            },
+                        "type": "input_text", # query type
+                        "text": "What are the names this PDF?" #query    
+                    }
+                ]
+            }
         ]
     )
     return response.output_text
