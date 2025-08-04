@@ -174,12 +174,37 @@ def image_input():
     )
     return response.output_text
 
-def pdf_input(): # didnt execute bcoz the server had an error processing your request
-    with open("some_file.pdf", "rb") as f: 
-        data = f.read()
+def Upload_PDF(): # to upload a pdf file and get the file ID to use it later "assistant-EZVRdGC85AUGdc64B2QZGu"
+    file = client.files.create(
+        file=open("Book_Summarization_IEEE.pdf", "rb"),
+        purpose="assistants"
+    )
+    result = file.model_dump_json(indent=2)
+    file_id = file.id
+    return (f"File uploaded successfully. File ID: {file_id}\n{result}")
 
-    base64_string = base64.b64encode(data).decode("utf-8")
+def pdf_input(): # Process the PDF file we uploaded earlier
+    response = client.responses.create(
+        model=model,
+        input = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_file", # input type  
+                        "file_id": "assistant-EZVRdGC85AUGdc64B2QZGu" # file ID of the PDF we uploaded earlier
+                    },
+                    {
+                        "type": "input_text", # query type
+                        "text": "What are the names this PDF?" #query    
+                    }
+                ]
+            }
+        ]
+    )
+    return response.output_text
 
+def background_task():
     response = client.responses.create(
         model=model, 
         input=[
@@ -187,16 +212,35 @@ def pdf_input(): # didnt execute bcoz the server had an error processing your re
                 "role": "user",
                 "content": [
                     {
-                        "type": "input_file",
-                        "filename": "book_summs.pdf",
-                        "file_data": f"data:application/pdf;base64,{base64_string}",
-                    },
-                    {
-                        "type": "input_text",
-                        "text": "Summarize this PDF",
-                    },
-                ],
-            },
-        ]
+                        "type": "input_text", 
+                        "text": "write me a long story"
+                    }
+                ]
+            }
+        ],
+        background=True,
+        stream=True
     )
-    return response.output_text
+
+    cursor = None
+    for event in response:
+        print("Received event:", event)
+
+        if hasattr(event, "sequence_number"):
+            cursor = event.sequence_number
+
+        if hasattr(event, "type") and event.type == "response.delta":
+            if hasattr(event, "delta") and event.delta.text:
+                print(event.delta.text, end="", flush=True)
+
+    print("\n--- Completed ---")
+    print("Final cursor:", cursor)
+
+    # while response.status in {"queued", "in_progress"}:  # will print the status untill the response is completed
+    #     print(f"Current status: {response.status}")
+    #     sleep(2)
+    #     response = client.responses.retrieve(response.id)
+    # print(f"Final status: {response.status}\nOutput:\n{response.output_text}")
+
+    # response = client.responses.cancel("resp_688c647eab148192949d36e0872bfe2e00ee1b7c550b41c0")
+    # return f"Response cancelled successfully. Status: {response.status}"
