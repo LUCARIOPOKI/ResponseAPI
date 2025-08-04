@@ -203,3 +203,44 @@ def pdf_input(): # Process the PDF file we uploaded earlier
         ]
     )
     return response.output_text
+
+def background_task():
+    response = client.responses.create(
+        model=model, 
+        input=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_text", 
+                        "text": "write me a long story"
+                    }
+                ]
+            }
+        ],
+        background=True,
+        stream=True
+    )
+
+    cursor = None
+    for event in response:
+        print("Received event:", event)
+
+        if hasattr(event, "sequence_number"):
+            cursor = event.sequence_number
+
+        if hasattr(event, "type") and event.type == "response.delta":
+            if hasattr(event, "delta") and event.delta.text:
+                print(event.delta.text, end="", flush=True)
+
+    print("\n--- Completed ---")
+    print("Final cursor:", cursor)
+
+    # while response.status in {"queued", "in_progress"}:  # will print the status untill the response is completed
+    #     print(f"Current status: {response.status}")
+    #     sleep(2)
+    #     response = client.responses.retrieve(response.id)
+    # print(f"Final status: {response.status}\nOutput:\n{response.output_text}")
+
+    # response = client.responses.cancel("resp_688c647eab148192949d36e0872bfe2e00ee1b7c550b41c0")
+    # return f"Response cancelled successfully. Status: {response.status}"
